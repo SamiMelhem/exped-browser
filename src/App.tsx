@@ -1,4 +1,4 @@
-import { Search, HelpCircle, MessageSquare, ArrowLeft, ArrowRight, RotateCw, Plus, X, Edit, Trash2, Send } from 'lucide-react';
+import { Search, HelpCircle, MessageSquare, ArrowLeft, ArrowRight, RotateCw, Plus, X, Edit, Trash2, Send, Command, Keyboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,22 +15,23 @@ import { ThemeToggle } from '@/components/theme-toggle';
 // Initialize EmailJS with your public key
 initEmailJS('8rKt3GBNLxfV2nP4k');
 
-// Define trusted domains that should open directly in a new tab
-const trustedDomains = [
-  'google.com',
-  'www.google.com',
-  'chat.openai.com',
-  'mail.google.com',
-  'github.com',
-  'www.github.com',
-  'notion.so',
-  'www.notion.so',
-  'linkedin.com',
-  'www.linkedin.com',
-  'youtube.com',
-  'www.youtube.com',
-  'reddit.com',
-  'www.reddit.com'
+const keyboardShortcuts = [
+  { description: 'Quick Search', key: '⌘ K', windows: 'Ctrl K' },
+  { description: 'New Tab', key: '⌘ T', windows: 'Ctrl T' },
+  { description: 'Close Tab', key: '⌘ W', windows: 'Ctrl W' },
+  { description: 'Reload Page', key: '⌘ R', windows: 'Ctrl R' },
+  { description: 'Go Back', key: '⌘ ←', windows: 'Alt ←' },
+  { description: 'Go Forward', key: '⌘ →', windows: 'Alt →' },
+];
+
+const browserControls = [
+  { icon: Search, description: 'Quick search with ⌘K or click the search bar' },
+  { icon: Plus, description: 'Add a new tab by clicking the + button' },
+  { icon: ArrowLeft, description: 'Go back to the previous page' },
+  { icon: ArrowRight, description: 'Go forward to the next page' },
+  { icon: RotateCw, description: 'Reload the current page' },
+  { icon: MessageSquare, description: 'Send feedback about Exped Browser' },
+  { icon: HelpCircle, description: 'View keyboard shortcuts and help' },
 ];
 
 // Default links with correct URLs and behaviors
@@ -135,6 +136,7 @@ function App() {
   const [mainSearchInput, setMainSearchInput] = useState<string>('');
   const [overlaySearchInput, setOverlaySearchInput] = useState<string>('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [showAddLink, setShowAddLink] = useState(false);
   const [newLink, setNewLink] = useState<Partial<AppLink>>({});
   const [editingLink, setEditingLink] = useState<AppLink | null>(null);
@@ -151,7 +153,6 @@ function App() {
   const [isMainSearching, setIsMainSearching] = useState(false);
   const [isOverlaySearching, setIsOverlaySearching] = useState(false);
   
-  const webviewRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
   const feedbackInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -300,16 +301,7 @@ function App() {
     }));
   };
 
-  const shouldOpenDirectly = (url: string): boolean => {
-    try {
-      const urlObj = new URL(url);
-      return trustedDomains.some(domain => urlObj.hostname.endsWith(domain));
-    } catch {
-      return false;
-    }
-  };
-
-  const createTabContent = (url: string, tabId: string) => {
+  const createTabContent = (url: string) => {
     const link = links.find(link => link.url === url);
     
     return {
@@ -340,7 +332,7 @@ function App() {
         if (tab.id === tabId) {
           const newTab = {
             ...tab,
-            ...createTabContent(fullUrl, tabId)
+            ...createTabContent(fullUrl),
           };
           updateTabHistory(tabId, fullUrl);
           return newTab;
@@ -420,7 +412,7 @@ function App() {
       if (t.id === activeTab) {
         return {
           ...t,
-          ...createTabContent(lastUrl, activeTab),
+          ...createTabContent(lastUrl),
           history: {
             past: t.history.past.slice(0, -1),
             future: [t.history.current, ...t.history.future],
@@ -441,7 +433,7 @@ function App() {
       if (t.id === activeTab) {
         return {
           ...t,
-          ...createTabContent(nextUrl, activeTab),
+          ...createTabContent(nextUrl),
           history: {
             past: [...t.history.past, t.history.current],
             future: t.history.future.slice(1),
@@ -461,8 +453,8 @@ function App() {
   };
 
   const activeTabData = tabs.find(tab => tab.id === activeTab);
-  const canGoBack = activeTabData?.history.past.length > 0;
-  const canGoForward = activeTabData?.history.future.length > 0;
+  const canGoBack = (activeTabData?.history?.past?.length ?? 0) > 0;
+  const canGoForward = (activeTabData?.history?.future?.length ?? 0) > 0;
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden">
@@ -547,7 +539,10 @@ function App() {
               <MessageSquare className="w-4 h-4 mr-2" />
               Feedback
             </button>
-            <button className="flex items-center px-3 py-1.5 text-muted-foreground hover:bg-muted rounded-full text-sm">
+            <button 
+              className="flex items-center px-3 py-1.5 text-muted-foreground hover:bg-muted rounded-full text-sm"
+              onClick={() => setShowHelp(true)}
+            >
               <HelpCircle className="w-4 h-4 mr-2" />
               Help
             </button>
@@ -701,119 +696,168 @@ function App() {
           </div>
         )}
       </main>
-
-      {showSearch && (
-        <div 
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-32 z-50"
-          onClick={() => {
-            setShowSearch(false);
-            setOverlaySearchResults([]);
-            setOverlaySearchInput('');
-          }}
-        >
+        {showSearch && (
           <div 
-            className="bg-card rounded-lg shadow-lg w-full max-w-2xl mx-4"
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-32 z-50"
+            onClick={() => {
+              setShowSearch(false);
+              setOverlaySearchResults([]);
+              setOverlaySearchInput('');
+            }}
           >
-            <div className="p-4">
-              <form onSubmit={handleOverlaySearch} className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                <Input 
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search anything..."
-                  className="w-full pl-12 pr-4 h-14 text-lg rounded-lg"
-                  value={overlaySearchInput}
-                  onChange={(e) => {
-                    setOverlaySearchInput(e.target.value);
-                    if (!e.target.value) {
+            <div 
+              className="bg-card rounded-lg shadow-lg w-full max-w-2xl mx-4"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-4">
+                <form onSubmit={handleOverlaySearch} className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                  <Input 
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search anything..."
+                    className="w-full pl-12 pr-4 h-14 text-lg rounded-lg"
+                    value={overlaySearchInput}
+                    onChange={(e) => {
+                      setOverlaySearchInput(e.target.value);
+                      if (!e.target.value) {
+                        setOverlaySearchResults([]);
+                      }
+                    }}
+                  />
+                </form>
+              </div>
+              
+              {isOverlaySearching ? (
+                <div className="p-8 text-center">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="mt-4 text-muted-foreground">Searching...</p>
+                </div>
+              ) : overlaySearchResults.length > 0 ? (
+                <div className="max-h-[60vh] overflow-hidden">
+                  <SearchResults 
+                    results={overlaySearchResults} 
+                    onResultClick={(url) => {
+                      navigateToUrl(url, activeTab);
+                      setOverlaySearchInput('');
+                      setShowSearch(false);
                       setOverlaySearchResults([]);
-                    }
-                  }}
-                />
+                    }} 
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {showFeedback && (
+          <div 
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-32 z-50"
+            onClick={() => setShowFeedback(false)}
+          >
+            <div 
+              className="bg-card rounded-lg shadow-lg w-full max-w-2xl mx-4 p-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <form onSubmit={handleFeedbackSubmit} className="space-y-4">
+                <h2 className="text-lg font-semibold">Send Feedback</h2>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name (optional)</Label>
+                  <Input
+                    id="name"
+                    placeholder="Enter your name"
+                    value={feedbackName}
+                    onChange={(e) => setFeedbackName(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="message">Message</Label>
+                  <Textarea
+                    id="message"
+                    ref={feedbackInputRef}
+                    placeholder="Tell us about your experience with Exped Browser..."
+                    className="h-32"
+                    value={feedbackMessage}
+                    onChange={(e) => setFeedbackMessage(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <Button 
+                    type="submit" 
+                    className="flex items-center gap-2"
+                    disabled={isSendingFeedback}
+                  >
+                    {isSendingFeedback ? (
+                      <>
+                        <div className="w -4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Send Feedback</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
               </form>
             </div>
-            
-            {isOverlaySearching ? (
-              <div className="p-8 text-center">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="mt-4 text-muted-foreground">Searching...</p>
-              </div>
-            ) : overlaySearchResults.length > 0 ? (
-              <div className="max-h-[60vh] overflow-hidden">
-                <SearchResults 
-                  results={overlaySearchResults} 
-                  onResultClick={(url) => {
-                    navigateToUrl(url, activeTab);
-                    setOverlaySearchInput('');
-                    setShowSearch(false);
-                    setOverlaySearchResults([]);
-                  }} 
-                />
-              </div>
-            ) : null}
           </div>
-        </div>
-      )}
+        )}
 
-      {showFeedback && (
-        <div 
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-32 z-50"
-          onClick={() => setShowFeedback(false)}
-        >
-          <div 
-            className="bg-card rounded-lg shadow-lg w-full max-w-2xl mx-4 p-6"
-            onClick={e => e.stopPropagation()}
-          >
-            <form onSubmit={handleFeedbackSubmit} className="space-y-4">
-              <h2 className="text-lg font-semibold">Send Feedback</h2>
-              
-              <div className="space-y-2">
-                <Label htmlFor="name">Name (optional)</Label>
-                <Input
-                  id="name"
-                  placeholder="Enter your name"
-                  value={feedbackName}
-                  onChange={(e) => setFeedbackName(e.target.value)}
-                />
-              </div>
+        {/* Help Dialog */}
+        <Dialog open={showHelp} onOpenChange={setShowHelp}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Keyboard Shortcuts & Controls</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-8 py-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Keyboard className="w-5 h-5 text-muted-foreground" />
+                    <h3 className="font-medium">Keyboard Shortcuts</h3>
+                  </div>
+                  <div className="grid gap-2">
+                    {keyboardShortcuts.map((shortcut, index) => (
+                      <div key={index} className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{shortcut.description}</span>
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
+                            {shortcut.key}
+                          </kbd>
+                          <span className="text-xs text-muted-foreground">or</span>
+                          <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
+                            {shortcut.windows}
+                          </kbd>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="message">Message</Label>
-                <Textarea
-                  id="message"
-                  ref={feedbackInputRef}
-                  placeholder="Tell us about your experience with Exped Browser..."
-                  className="h-32"
-                  value={feedbackMessage}
-                  onChange={(e) => setFeedbackMessage(e.target.value)}
-                  required
-                />
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Command className="w-5 h-5 text-muted-foreground" />
+                    <h3 className="font-medium">Browser Controls</h3>
+                  </div>
+                  <div className="grid gap-3">
+                    {browserControls.map((control, index) => (
+                      <div key={index} className="flex items-center gap-3 text-sm">
+                        <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-lg">
+                          <control.icon className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <span className="text-muted-foreground">{control.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-
-              <div className="flex justify-end">
-                <Button 
-                  type="submit" 
-                  className="flex items-center gap-2 " 
-                  disabled={isSendingFeedback}
-                >
-                  {isSendingFeedback ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                      <span className="ml-2">Sending...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      <span>Send Feedback</span>
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </DialogContent>
+          </Dialog>
     </div>
   );
 }

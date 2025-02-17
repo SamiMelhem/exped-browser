@@ -1,14 +1,14 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const isDev = process.env.NODE_ENV === 'development';
-
 const store = new Store();
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: 'C:\\Users\\samim\\OneDrive\\Documents\\Projects\\exped-browser\\public\\icon.ico',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
