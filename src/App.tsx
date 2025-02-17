@@ -151,7 +151,7 @@ function App() {
   const [isMainSearching, setIsMainSearching] = useState(false);
   const [isOverlaySearching, setIsOverlaySearching] = useState(false);
   
-  const iframeRefs = useRef<{ [key: string]: HTMLIFrameElement | null }>({});
+  const webviewRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
   const feedbackInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -318,13 +318,13 @@ function App() {
       icon: link?.icon || `${new URL(url).origin}/favicon.ico`,
       content: (
         <div className="w-full h-full">
-          <iframe
-            ref={el => iframeRefs.current[tabId] = el}
+          <webview
             src={url}
-            className="w-full h-full border-0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-            title={link?.name || new URL(url).hostname}
+            style={{
+              width: "100%",
+              height: "100%",
+              border: "none"
+            }}
           />
         </div>
       )
@@ -787,25 +787,25 @@ function App() {
                   className="h-32"
                   value={feedbackMessage}
                   onChange={(e) => setFeedbackMessage(e.target.value)}
-                   required
+                  required
                 />
               </div>
 
               <div className="flex justify-end">
                 <Button 
                   type="submit" 
-                  className="flex items-center gap-2" 
+                  className="flex items-center gap-2 " 
                   disabled={isSendingFeedback}
                 >
                   {isSendingFeedback ? (
                     <>
                       <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                      Sending...
+                      <span className="ml-2">Sending...</span>
                     </>
                   ) : (
                     <>
                       <Send className="w-4 h-4" />
-                      Send Feedback
+                      <span>Send Feedback</span>
                     </>
                   )}
                 </Button>
